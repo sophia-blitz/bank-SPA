@@ -118,6 +118,8 @@ const accounts = {
       };
       let modal = $(this);
       modal.find('#accountNameSpan').text(accountName);
+      modal.find('#accountIdSpan').text(accountId);
+      modal.find('#accountTypeSpan').text(accountType);
 
       let delBtn = document.getElementById("deleteButton");
       delBtn.onclick = function () {
@@ -139,7 +141,7 @@ const accounts = {
       accounts.accountsTable.deleteRow(1);
     }
 
-    // add new row for each book
+    // add new row for each account
     let rowCount = 1;
     accounts.accountsArray.forEach(element => {
       // create new row
@@ -150,7 +152,7 @@ const accounts = {
       let cellCount = 0;
       const rowNumber = row.insertCell(cellCount++);
       rowNumber.scope = "row";
-      rowNumber.innerHTML = rowCount - 1 + "."; // element.bookId
+      rowNumber.innerHTML = rowCount - 1 + ".";
 
       const accountIdCell = row.insertCell(cellCount++);
       accountIdCell.innerHTML = element.accountId;
