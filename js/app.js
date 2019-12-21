@@ -102,6 +102,9 @@ const accounts = {
     if (data && data.hasOwnProperty('addAccount')) {
       accounts.addAccount(data.addAccount);
     }
+    if (data && data.hasOwnProperty('editAccount')) {
+      accounts.editAccount(data.editAccount);
+    }
     accounts.fetchAccountList(accounts.displayAccounts, accounts.displayBookListError);
     $('#deleteModal').on('show.bs.modal', function (event) {
       let button = $(event.relatedTarget) // Button that triggered the modal
@@ -192,7 +195,7 @@ const accounts = {
     accounts.fetchAccountList(accounts.displayAccounts, accounts.displayBookListError);
   },
   fetchAccountList: async function (success, fail) {
-    if (!accounts.accountsArray) { 
+    if (!accounts.accountsArray) {
       let dataString = window.localStorage.getItem(BANK_APP_STORAGE_KEY);
       accounts.accountsArray = JSON.parse(dataString);
     }
@@ -209,22 +212,27 @@ const accounts = {
       success(accounts.accountsArray);
     }
   },
-  addAccount(account){
-    if(!accounts.accountsArray){
+  fetchAccount(id) {
+    if (!accounts.accountsArray) {
+      return null;
+    }
+    let result = null;
+    for (let act of accounts.accountsArray) {
+      if (act.accountId == id) {
+        result = act;
+      }
+    }
+    return result;
+  },
+  addAccount(account) {
+    if (!accounts.accountsArray) {
       accounts.displayAlert({
-            type: "danger",
-            message: `Oops. Something went wrong. Could not add ${account.accountType} account ${account.accountId} for ${account.accountName}.`
-        });
-      // accounts.fetchAccountList(
-      //   _ => accounts.addAccount(account), 
-      //   _ => accounts.displayAlert({ 
-      //       type: "danger",
-      //       message: `Oops. Something went wrong. Could not add ${account.accountType} account ${account.accountId} for ${account.accountName}.`
-      //   })
-      // )
+        type: "danger",
+        message: `Oops. Something went wrong. Could not add ${account.accountType} account ${account.accountId} for ${account.accountName}.`
+      });
     } else {
-      let isDuplicateId = accounts.accountsArray.reduce((out,act)=> (out || act.accountId == account.accountId),false);
-      if (isDuplicateId){
+      let isDuplicateId = accounts.accountsArray.reduce((out, act) => (out || act.accountId == account.accountId), false);
+      if (isDuplicateId) {
         accounts.displayAlert({
           type: "danger",
           message: `Oops. That account number already exists. Could not add ${account.accountType} account ${account.accountId} for ${account.accountName}.`
@@ -236,9 +244,32 @@ const accounts = {
           type: "success",
           message: `${account.accountType} account ${account.accountId} for ${account.accountName} was added.`
         });
-        accounts.displayAccounts(accounts.accountsArray);
+        accounts.displayAccounts();
       }
     }
+  },
+  editAccount(account) {
+    if (!accounts.accountsArray) {
+      accounts.displayAlert({
+        type: "danger",
+        message: `Oops. Something went wrong. Could not edit ${account.accountType} account ${account.accountId} for ${account.accountName}.`
+      });
+    } else {
+      accounts.accountsArray = accounts.accountsArray.map(act => {
+        if (act.accountId === account.accountId) {
+          return account;
+        } else {
+          return act;
+        }
+      });
+      window.localStorage.setItem(BANK_APP_STORAGE_KEY, JSON.stringify(accounts.accountsArray));
+      accounts.displayAccounts();
+      accounts.displayAlert({
+        type: "success",
+        message: `${account.accountType} account ${account.accountId} for ${account.accountName} was edited.`
+      });
+    }
+
   },
   onClickDelete(account) {
     accounts.deleteAccount(
@@ -251,7 +282,7 @@ const accounts = {
     );
   },
   deleteAccount(id, success, fail) {
-  
+
     let done = false;
     try {
       accounts.accountsArray = accounts.accountsArray.filter(act => act.accountId != id);
@@ -315,14 +346,13 @@ const addAccount = {
   load() {
     addAccount.resetBtn.addEventListener('click', addAccount.onClickResetBtn);
     addAccount.addAccountBtn.addEventListener('click', addAccount.onClickAddAccountBtn);
-    addAccount.form.load()
+    addAccount.form.load('add')
 
   },
   /**
    * clear form of data and errors
    */
   onClickResetBtn: function () {
-    console.log("onClickResetBtn Called");
     // clear form
     addAccount.form.hideErrorMessage();
     addAccount.form.resetFields();
@@ -351,8 +381,8 @@ const addAccount = {
    * @param {Object} account New account to add to database list including properties 
    *  accountId, accountName, accountType
    */
-  postNewAccount(account) { // TODO: implement local post
-    goToPage(ACCOUNTS,{addAccount: account});
+  postNewAccount(account) {
+    goToPage(ACCOUNTS, { addAccount: account });
   }
 }
 
@@ -404,14 +434,14 @@ const editAccount = {
     return editAccount.content;
   },
   load(data) {
-    // console.log(data);
-    editAccount.accountId = parseInt(data.accountId);
+    editAccount.accountId = data.accountId;
     editAccount.title = `Bank | Edit Account ID: ${editAccount.accountId}`;
+
+    editAccount.form.load('edit');
     editAccount.fetchAccount(
       editAccount.accountId,
-      editAccount.form.displayBookData,
+      editAccount.form.displayAccountData,
       editAccount.form.displayErrorMessage);
-    editAccount.form.load()
     editAccount.cancelBtn.addEventListener('click', editAccount.onClickCancelBtn);
     editAccount.saveBtn.addEventListener('click', editAccount.onClickSaveBtn);
   },
@@ -461,41 +491,18 @@ const editAccount = {
    * @param {function} success zero-parameter callback function to call upon successful post
    * @param {function} fail single parameter callback function accepting HTML formatted error message
    */
-  postEditAccount: async function (account, success, fail) { //TODO: rewrite post locally
-    let done = true;
-    try {
-      const response = await fetch(`https://elibraryrestapi.herokuapp.com/elibrary/api/book/update/${account.bookId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(account)
-      });
-      const confirmBook = await response.json();
-      for (let key in account) {
-        // console.log(`${key}: reply: ${confirmBook[key]} sent: ${book[key]}`); // DEBUG
-        if (confirmBook[key] != account[key]) {
-          done = false;
-        }
-      }
-    } catch (e) {
-      console.error(e);
-      fail("ERROR-- " + e.message + ". Try again later.");
-    }
-    if (done) {
-      success();
-    }
+  postEditAccount: async function (account, success, fail) {
+    goToPage(ACCOUNTS, { editAccount: account });
   },
 
-  fetchAccount: async function (id, success, fail) {//TODO: rewrite fetch locally
+  fetchAccount: function (id, success, fail) {//TODO: rewrite fetch locally
 
-    try {
-      const response = await fetch(`https://elibraryrestapi.herokuapp.com/elibrary/api/book/get/${id}`);
-      const book = await response.json();
-      // console.log(book);
-      success(book);
-    } catch (e) {
-
-      fail("Error-- Could not load book to edit. " + e.message);
-      console.error(e);
+    const account = accounts.fetchAccount(id);
+    if (account) {
+      success(account);
+    }
+    else {
+      fail("Could not load account to edit.");
     }
   }
 }
@@ -536,12 +543,15 @@ const accountForm = {
     return accountForm.content;
 
   },
-  load() {
+  load(mode) {
     accountForm.errorDiv = accountForm.errorDiv || document.getElementById("errorMsg");
     accountForm.errorDiv.classList.add("hidden");
-    accountForm.accountTypeSelect = accountForm.accountTypeSelect || document.getElementById("accountType");
-    accountForm.inputs = accountForm.inputs || document.getElementsByTagName("input");
+    accountForm.accountTypeSelect = document.getElementById("accountType");
+    accountForm.inputs = document.getElementsByTagName("input");
     for (let input of accountForm.inputs) {
+      if(input.id == 'accountId' && mode=="edit"){
+        input.disabled = true;
+      }
       input.value = "";
     }
   },
@@ -556,6 +566,15 @@ const accountForm = {
     for (let input of accountForm.inputs) {
       input.value = account[input.id];
     }
+    accountForm.accountTypeSelect.value = account.accountType;
+    let options = document.getElementsByTagName("option");
+    // for (let option of options) {
+    //   if (option.value == account.accountType) {
+    //     option.selected = true;
+    //   } else{
+    //     option.selected = false;
+    //   }
+    // }
   },
   hideErrorMessage() {
     accountForm.errorDiv.innerHTML = "";
@@ -593,7 +612,7 @@ const accountForm = {
     for (let input of accountForm.inputs) {
       results.account[input.id] = (input.value + "").trim();
     }
-    results.account['accountType'] = accountForm.accountTypeSelect.value;
+    results.account.accountType = accountForm.accountTypeSelect.value;
 
     // create error list to show in error div
     const errorList = document.createElement('ul');
@@ -701,7 +720,6 @@ function getPageAndDataFromURL() {
     let [key, value] = param.split('=');
     if (key.length > 0) {
       results.data[key] = value;
-      // console.log(`key: ${key}. value: ${value}`); // DEBUG
     }
   }
   return results;
